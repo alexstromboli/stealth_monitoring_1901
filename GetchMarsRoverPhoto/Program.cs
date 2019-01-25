@@ -10,7 +10,7 @@ namespace GetchMarsRoverPhoto
     {
         static void Main(string[] args)
         {
-            if (args.Length < 1)
+            if (args.Length < 2)
             {
                 Console.WriteLine ("Usage:");
                 Console.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
@@ -24,7 +24,7 @@ namespace GetchMarsRoverPhoto
             string strDate = args[1];
 
             // parse date
-            DateTime dtDay;
+            DateTime dtDay = default (DateTime);
             CultureInfo ciEnglish = new CultureInfo ("en-us");
             if (new[]
                 {
@@ -38,6 +38,8 @@ namespace GetchMarsRoverPhoto
                 Console.WriteLine ("Wrong date format: " + strDate);
                 return;
             }
+
+            Console.WriteLine (dtDay.ToString ("yyyy-MM-dd"));
         }
     }
 }
