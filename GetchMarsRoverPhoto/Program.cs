@@ -10,36 +10,36 @@ namespace GetchMarsRoverPhoto
     {
         static void Main(string[] args)
         {
-            if (args.Length < 2)
+            if (args.Length < 1)
             {
-                Console.WriteLine ("Usage:");
-                Console.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
-                    + " <api-key> <date>");
+                Console.Error.WriteLine ("Usage:");
+                Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
+                    + " <api-key> [dates-file] [--date <date>]");
 
                 return;
             }
 
             // parameters
-            string ApiKey = args[0];
-            string strDate = args[1];
+            Utils.Args Args = new Utils.Args (args);
+            string strDate = Args.ExtractValue ("--date");
+
+            string ApiKey = Args[0];
+            string DatesFilePath = null;
+
+            if (Args.Count > 1)
+            {
+                DatesFilePath = Path.GetFullPath (Args[1]);
+            }
 
             // parse date
-            DateTime dtDay = default (DateTime);
-            CultureInfo ciEnglish = new CultureInfo ("en-us");
-            if (new[]
-                {
-                    "MM/dd/yy",
-                    "MMMM d, yyyy",
-                    "MMM-d-yyyy"
-                }
-                .All (f => !DateTime.TryParseExact (strDate, f, ciEnglish, DateTimeStyles.None, out dtDay))
-                )
+            DateTime? dtDay = Utils.ReadDateTime.Try (strDate);
+            if (dtDay == null)
             {
-                Console.WriteLine ("Wrong date format: " + strDate);
+                Console.Error.WriteLine ("Wrong date format: " + strDate);
                 return;
             }
 
-            Console.WriteLine (dtDay.ToString ("yyyy-MM-dd"));
+            Console.WriteLine (dtDay.Value.ToString ("yyyy-MM-dd"));
         }
     }
 }
