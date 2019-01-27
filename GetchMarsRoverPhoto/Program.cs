@@ -12,7 +12,7 @@ namespace GetchMarsRoverPhoto
 		{
 				Console.Error.WriteLine ("Usage:");
 				Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
-					+ " <api-key> [<dates-file> | --date <date>] [--index <pic-index> [--open]]");
+					+ " <api-key> [<dates-file> | --date <date>] [--outDir <output-dir>] [--index <pic-index> [--open]]");
 		}
 
 		static void Main(string[] args)
@@ -23,6 +23,7 @@ namespace GetchMarsRoverPhoto
 			// switches
 			string strDate = Args.ExtractValue ("--date", "-d");
 			string strIndex = Args.ExtractValue ("--index", "-i");
+			string OutputDir = Path.GetFullPath (Args.ExtractValue ("--outDir") ?? ".");
 			bool AutoOpen = Args.ExtractKey ("--open", "-o") != null;
 
 			// mandatory
@@ -49,10 +50,15 @@ namespace GetchMarsRoverPhoto
 
 			// parse date
 			DateTime? dtDay = Utils.ReadDateTime.Try (strDate);
-			if (dtDay == null)
+			if (strDate != null && dtDay == null)
 			{
 				Console.Error.WriteLine ("Wrong date format: " + strDate);
 				return;
+			}
+
+			if (dtDay == null && DatesFilePath == null)
+			{
+				dtDay = DateTime.Today;
 			}
 
 			// parse index
@@ -69,7 +75,38 @@ namespace GetchMarsRoverPhoto
 				PictureIndex = Index;
 			}
 
-			Console.WriteLine (dtDay.Value.ToString ("yyyy-MM-dd"));
+			if (AutoOpen && PictureIndex == null)
+			{
+				Console.Error.WriteLine ("Auto-open requires picture index.");
+				return;
+			}
+
+			// get the dates
+			List<DateTime> Dates = new List<DateTime> ();
+			if (dtDay != null)
+			{
+				Dates.Add (dtDay.Value);
+			}
+			else	// file is already assured to be given
+			{
+				// here: check that file exists
+				string[] DateLines = File.ReadAllLines (DatesFilePath);
+				foreach (string DateLine in DateLines)
+				{
+					DateTime? Date = Utils.ReadDateTime.Try (DateLine);
+
+					if (Date != null)
+					{
+						Dates.Add (Date.Value);
+					}
+				}
+			}
+
+			if (Dates.Count == 0)
+			{
+				Console.Error.WriteLine ("No dates specified.");
+				return;
+			}
 		}
 	}
 }
