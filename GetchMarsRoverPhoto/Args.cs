@@ -10,7 +10,7 @@ namespace GetchMarsRoverPhoto.Utils
 		{
 		}
 
-		public string ExtractValue (string[] Keys)
+		public string ExtractValue (params string[] Keys)
 		{
 			for (int i = 0; i < Count - 1; ++i)
 			{

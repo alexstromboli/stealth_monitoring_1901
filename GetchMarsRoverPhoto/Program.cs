@@ -6,40 +6,69 @@ using System.Collections.Generic;
 
 namespace GetchMarsRoverPhoto
 {
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            if (args.Length < 1)
-            {
-                Console.Error.WriteLine ("Usage:");
-                Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
-                    + " <api-key> [dates-file] [--date <date>]");
+	class Program
+	{
+		static void PrintUsage ()
+		{
+				Console.Error.WriteLine ("Usage:");
+				Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
+					+ " <api-key> [<dates-file> | --date <date>] [--index <pic-index>]");
+		}
 
-                return;
-            }
+		static void Main(string[] args)
+		{
+			// parameters
+			Utils.Args Args = new Utils.Args (args);
 
-            // parameters
-            Utils.Args Args = new Utils.Args (args);
-            string strDate = Args.ExtractValue ("--date");
+			// switches
+			string strDate = Args.ExtractValue ("--date", "-d");
+			string strIndex = Args.ExtractValue ("--index", "-i");
 
-            string ApiKey = Args[0];
-            string DatesFilePath = null;
+			// mandatory
+			if (args.Length < 1)
+			{
+				PrintUsage ();
+				return;
+			}
 
-            if (Args.Count > 1)
-            {
-                DatesFilePath = Path.GetFullPath (Args[1]);
-            }
+			string ApiKey = Args[0];
+			string DatesFilePath = Args.Count > 1 ? Args[1] : null;
 
-            // parse date
-            DateTime? dtDay = Utils.ReadDateTime.Try (strDate);
-            if (dtDay == null)
-            {
-                Console.Error.WriteLine ("Wrong date format: " + strDate);
-                return;
-            }
+			if (DatesFilePath != null)
+			{
+				DatesFilePath = Path.GetFullPath (Args[1]);
+			}
 
-            Console.WriteLine (dtDay.Value.ToString ("yyyy-MM-dd"));
-        }
-    }
+			// either date or file, not both
+			if (DatesFilePath != null && strDate != null)
+			{
+				PrintUsage ();
+				return;
+			}
+
+			// parse date
+			DateTime? dtDay = Utils.ReadDateTime.Try (strDate);
+			if (dtDay == null)
+			{
+				Console.Error.WriteLine ("Wrong date format: " + strDate);
+				return;
+			}
+
+			// parse index
+			int? PictureIndex = null;
+			if (strIndex != null)
+			{
+				int Index;
+				if (!int.TryParse (strIndex, out Index))
+				{
+					Console.Error.WriteLine ("Wrong date format: " + strDate);
+					return;
+				}
+
+				PictureIndex = Index;
+			}
+
+			Console.WriteLine (dtDay.Value.ToString ("yyyy-MM-dd"));
+		}
+	}
 }
