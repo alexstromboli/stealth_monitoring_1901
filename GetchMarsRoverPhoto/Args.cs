@@ -26,9 +26,19 @@ namespace GetchMarsRoverPhoto.Utils
 			return null;
 		}
 
-		public string ExtractValue (string Key)
+		public string ExtractKey (params string[] Keys)
 		{
-			return ExtractValue (new[] { Key });
+			for (int i = 0; i < Count; ++i)
+			{
+				if (Keys.Any (k => k == this[i]))
+				{
+					string Result = this[i];
+					RemoveAt(i);
+					return Result;
+				}
+			}
+
+			return null;
 		}
 	}
 }

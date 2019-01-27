@@ -12,7 +12,7 @@ namespace GetchMarsRoverPhoto
 		{
 				Console.Error.WriteLine ("Usage:");
 				Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
-					+ " <api-key> [<dates-file> | --date <date>] [--index <pic-index>]");
+					+ " <api-key> [<dates-file> | --date <date>] [--index <pic-index> [--open]]");
 		}
 
 		static void Main(string[] args)
@@ -23,6 +23,7 @@ namespace GetchMarsRoverPhoto
 			// switches
 			string strDate = Args.ExtractValue ("--date", "-d");
 			string strIndex = Args.ExtractValue ("--index", "-i");
+			bool AutoOpen = Args.ExtractKey ("--open", "-o") != null;
 
 			// mandatory
 			if (args.Length < 1)
@@ -61,7 +62,7 @@ namespace GetchMarsRoverPhoto
 				int Index;
 				if (!int.TryParse (strIndex, out Index))
 				{
-					Console.Error.WriteLine ("Wrong date format: " + strDate);
+					Console.Error.WriteLine ("Wrong index format: " + strIndex);
 					return;
 				}
 
