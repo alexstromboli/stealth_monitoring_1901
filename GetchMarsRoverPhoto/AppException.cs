@@ -11,6 +11,24 @@ namespace GetchMarsRoverPhoto
 		}
 	}
 
+	// wrong/inconsistent command line arguments
+	class ArgumentsException : AppException
+	{
+		public ArgumentsException (string Message, Exception InnerException = null)
+			: base (Message, InnerException)
+		{
+		}
+	}
+
+	// missing command line arguments
+	class NoArgumentsException : AppException
+	{
+		public NoArgumentsException (Exception InnerException = null)
+			: base ("Missing commmand line arguments.", InnerException)
+		{
+		}
+	}
+
 	// NASA API related exception
 	class NasaApiException : AppException
 	{

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net;
-using System.Linq;
 using System.Diagnostics;
-using System.Globalization;
 using System.Collections.Generic;
 
 using Newtonsoft.Json;
@@ -21,96 +19,29 @@ namespace GetchMarsRoverPhoto
 
 		static void Run (string[] ArgsRaw)
 		{
-			// parameters
-			Utils.Args Args = new Utils.Args (ArgsRaw);
-
-			// switches
-			string strDate = Args.ExtractValue ("--date", "-d");
-			string strIndex = Args.ExtractValue ("--index", "-i");
-			string OutputDir = Path.GetFullPath (Args.ExtractValue ("--outDir") ?? ".");
-			bool AutoOpen = Args.ExtractKey ("--open", "-o") != null;
-
-			// mandatory
-			if (ArgsRaw.Length < 1)
-			{
-				PrintUsage ();
-				return;
-			}
-
-			string ApiKey = Args[0];
-			string DatesFilePath = Args.Count > 1 ? Args[1] : null;
-
-			if (DatesFilePath != null)
-			{
-				DatesFilePath = Path.GetFullPath (Args[1]);
-			}
-
-			// either date or file, not both
-			if (DatesFilePath != null && strDate != null)
-			{
-				PrintUsage ();
-				return;
-			}
-
-			// parse date
-			DateTime? dtDay = Utils.ReadDateTime.Try (strDate);
-			if (strDate != null && dtDay == null)
-			{
-				Console.Error.WriteLine ("Wrong date format: " + strDate);
-				return;
-			}
-
-			if (dtDay == null && DatesFilePath == null)
-			{
-				dtDay = DateTime.Today;
-			}
-
-			// parse index
-			int? PhotoIndex = null;		// 1-based
-			if (strIndex != null)
-			{
-				int Index;
-				if (!int.TryParse (strIndex, out Index))
-				{
-					Console.Error.WriteLine ("Wrong index format: " + strIndex);
-					return;
-				}
-
-				PhotoIndex = Index;
-			}
-
-			if (AutoOpen && PhotoIndex == null)
-			{
-				Console.Error.WriteLine ("Auto-open requires photo index.");
-				return;
-			}
-
-			if (PhotoIndex != null && DatesFilePath != null)
-			{
-				Console.Error.WriteLine ("Photo index is only allowed for specific date.");
-				return;
-			}
+			// task
+			ProgramTask ProgramTask = new ProgramTask (ArgsRaw);
 
 			// get the dates
 			List<DateTime> Dates = new List<DateTime> ();
-			if (dtDay != null)
+			if (ProgramTask.dtDay != null)
 			{
-				Dates.Add (dtDay.Value);
+				Dates.Add (ProgramTask.dtDay.Value);
 			}
 			else	// file is already assured to be specified
 			{
 				string[] DateLines;
 				try
 				{
-					DateLines = File.ReadAllLines (DatesFilePath);
+					DateLines = File.ReadAllLines (ProgramTask.DatesFilePath);
 				}
 				catch (FileNotFoundException ex)
 				{
-					throw new AppException ($"Failed to read {DatesFilePath}. File must be missing.", ex);
+					throw new AppException ($"Failed to read {ProgramTask.DatesFilePath}. File must be missing.", ex);
 				}
 				catch (UnauthorizedAccessException ex)
 				{
-					throw new AppException ($"Failed to read {DatesFilePath}. Must be privileges issue.", ex);
+					throw new AppException ($"Failed to read {ProgramTask.DatesFilePath}. Must be privileges issue.", ex);
 				}
 
 				foreach (string DateLine in DateLines)
@@ -136,7 +67,7 @@ namespace GetchMarsRoverPhoto
 			foreach (DateTime Date in Dates)
 			{
 				// summary
-				string SummaryUrl = $"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={Date.ToString("yyyy-MM-dd")}&api_key={ApiKey}";
+				string SummaryUrl = $"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={Date.ToString("yyyy-MM-dd")}&api_key={ProgramTask.ApiKey}";
 				
 				string SummaryJson;
 				try
@@ -165,25 +96,25 @@ namespace GetchMarsRoverPhoto
 				}
 
 				// verify length
-				if (PhotoIndex != null && DaySummary.Photos.Length < PhotoIndex.Value)
+				if (ProgramTask.PhotoIndex != null && DaySummary.Photos.Length < ProgramTask.PhotoIndex.Value)
 				{
-					Console.Error.WriteLine ($"Photo index ({PhotoIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
+					Console.Error.WriteLine ($"Photo index ({ProgramTask.PhotoIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
 					return;
 				}
 
 				int MinIndex = 0;
 				int MaxIndexExcl = DaySummary.Photos.Length;
 
-				if (PhotoIndex != null)
+				if (ProgramTask.PhotoIndex != null)
 				{
-					MinIndex = PhotoIndex.Value - 1;		// PhotoIndex is 1-based
+					MinIndex = ProgramTask.PhotoIndex.Value - 1;		// PhotoIndex is 1-based
 					MaxIndexExcl = MinIndex + 1;
 				}
 
 				for (int i = MinIndex; i < MaxIndexExcl; ++i)
 				{
 					NasaApi.Photo Photo = DaySummary.Photos[i];
-					string DirPath = Path.Combine (OutputDir, Photo.EarthDate.ToString ("yyyy-MM-dd"));
+					string DirPath = Path.Combine (ProgramTask.OutputDir, Photo.EarthDate.ToString ("yyyy-MM-dd"));
 					
 					try
 					{
@@ -227,7 +158,7 @@ namespace GetchMarsRoverPhoto
 						throw new AppException ($"Failed to download photo at {Photo.ImageUrl}. Can be connection fault.", ex);
 					}
 
-					if (AutoOpen)
+					if (ProgramTask.AutoOpen)
 					{
 						Process pOpenImage = new Process ();
 						pOpenImage.StartInfo.UseShellExecute = true; 
@@ -243,11 +174,19 @@ namespace GetchMarsRoverPhoto
 				return;
 			}
 		}
-		static void Main (string[] args)
+		static void Main (string[] ArgsRaw)
 		{
 			try
 			{
-				Run (args);
+				Run (ArgsRaw);
+			}
+			catch (NoArgumentsException)
+			{
+				PrintUsage ();
+			}
+			catch (ArgumentsException ex)
+			{
+				Console.Error.WriteLine (ex.Message);
 			}
 			catch (Exception ex)
 			{
