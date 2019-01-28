@@ -19,10 +19,10 @@ namespace GetchMarsRoverPhoto
 					+ " <api-key> [<dates-file> | --date <date>] [--outDir <output-dir>] [--index <photo-index> [--open]]");
 		}
 
-		static void Main(string[] args)
+		static void Run (string[] ArgsRaw)
 		{
 			// parameters
-			Utils.Args Args = new Utils.Args (args);
+			Utils.Args Args = new Utils.Args (ArgsRaw);
 
 			// switches
 			string strDate = Args.ExtractValue ("--date", "-d");
@@ -31,7 +31,7 @@ namespace GetchMarsRoverPhoto
 			bool AutoOpen = Args.ExtractKey ("--open", "-o") != null;
 
 			// mandatory
-			if (args.Length < 1)
+			if (ArgsRaw.Length < 1)
 			{
 				PrintUsage ();
 				return;
@@ -241,6 +241,31 @@ namespace GetchMarsRoverPhoto
 			{
 				Console.Error.WriteLine ($"No photos are present for the specified date(s).");
 				return;
+			}
+		}
+		static void Main (string[] args)
+		{
+			try
+			{
+				Run (args);
+			}
+			catch (Exception ex)
+			{
+				// display the entire exception stack
+				Exception NextEx = ex;
+
+				while (NextEx != null)
+				{
+					Console.Error.WriteLine (NextEx.GetType ().FullName + ": " + NextEx.Message);
+					Console.Error.WriteLine (NextEx.StackTrace);
+
+					NextEx = NextEx.InnerException;
+
+					if (NextEx != null)
+					{
+						Console.Error.WriteLine ();
+					}
+				}
 			}
 		}
 	}
