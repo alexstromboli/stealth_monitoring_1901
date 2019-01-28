@@ -16,7 +16,7 @@ namespace GetchMarsRoverPhoto
 		{
 				Console.Error.WriteLine ("Usage:");
 				Console.Error.WriteLine (Path.GetFileName (Environment.GetCommandLineArgs()[0])
-					+ " <api-key> [<dates-file> | --date <date>] [--outDir <output-dir>] [--index <pic-index> [--open]]");
+					+ " <api-key> [<dates-file> | --date <date>] [--outDir <output-dir>] [--index <photo-index> [--open]]");
 		}
 
 		static void Main(string[] args)
@@ -66,7 +66,7 @@ namespace GetchMarsRoverPhoto
 			}
 
 			// parse index
-			int? PictureIndex = null;		// 1-based
+			int? PhotoIndex = null;		// 1-based
 			if (strIndex != null)
 			{
 				int Index;
@@ -76,18 +76,18 @@ namespace GetchMarsRoverPhoto
 					return;
 				}
 
-				PictureIndex = Index;
+				PhotoIndex = Index;
 			}
 
-			if (AutoOpen && PictureIndex == null)
+			if (AutoOpen && PhotoIndex == null)
 			{
-				Console.Error.WriteLine ("Auto-open requires picture index.");
+				Console.Error.WriteLine ("Auto-open requires photo index.");
 				return;
 			}
 
-			if (PictureIndex != null && DatesFilePath != null)
+			if (PhotoIndex != null && DatesFilePath != null)
 			{
-				Console.Error.WriteLine ("Picture index is only allowed for specific date.");
+				Console.Error.WriteLine ("Photo index is only allowed for specific date.");
 				return;
 			}
 
@@ -97,10 +97,22 @@ namespace GetchMarsRoverPhoto
 			{
 				Dates.Add (dtDay.Value);
 			}
-			else	// file is already assured to be given
+			else	// file is already assured to be specified
 			{
-				// here: check that file exists
-				string[] DateLines = File.ReadAllLines (DatesFilePath);
+				string[] DateLines;
+				try
+				{
+					DateLines = File.ReadAllLines (DatesFilePath);
+				}
+				catch (FileNotFoundException ex)
+				{
+					throw new AppException ($"Failed to read {DatesFilePath}. File must be missing.", ex);
+				}
+				catch (UnauthorizedAccessException ex)
+				{
+					throw new AppException ($"Failed to read {DatesFilePath}. Must be privileges issue.", ex);
+				}
+
 				foreach (string DateLine in DateLines)
 				{
 					DateTime? Date = Utils.ReadDateTime.Try (DateLine);
@@ -120,25 +132,51 @@ namespace GetchMarsRoverPhoto
 
 			// loading
 			WebClient Client = new WebClient ();
+			int PhotosTotalCount = 0;
 			foreach (DateTime Date in Dates)
 			{
 				// summary
 				string SummaryUrl = $"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={Date.ToString("yyyy-MM-dd")}&api_key={ApiKey}";
-				string SummaryJson = Client.DownloadString (SummaryUrl);
-				NasaApi.DaySummary DaySummary = JsonConvert.DeserializeObject<NasaApi.DaySummary> (SummaryJson);
-
-				if (PictureIndex != null && DaySummary.Photos.Length < PictureIndex.Value)
+				
+				string SummaryJson;
+				try
 				{
-					Console.Error.WriteLine ($"Picture index ({PictureIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
+					SummaryJson = Client.DownloadString (SummaryUrl);
+				}
+				catch (Exception ex)
+				{
+					if (ex is WebException wex && wex.Message == "The remote server returned an error: (403) Forbidden.")
+					{
+						throw new NasaApiForbiddenException (ex);
+					}
+
+					throw new NasaApiException ("Failed to download day photos information.", ex);
+				}
+
+				// deserialize
+				NasaApi.DaySummary DaySummary;
+				try
+				{
+					DaySummary = JsonConvert.DeserializeObject<NasaApi.DaySummary> (SummaryJson);
+				}
+				catch (Exception ex)
+				{
+					throw new NasaApiException ("Error while deserializing day photos information. Must be ill-formatted JSON.", ex);
+				}
+
+				// verify length
+				if (PhotoIndex != null && DaySummary.Photos.Length < PhotoIndex.Value)
+				{
+					Console.Error.WriteLine ($"Photo index ({PhotoIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
 					return;
 				}
 
 				int MinIndex = 0;
 				int MaxIndexExcl = DaySummary.Photos.Length;
 
-				if (PictureIndex != null)
+				if (PhotoIndex != null)
 				{
-					MinIndex = PictureIndex.Value - 1;		// PictureIndex is 1-based
+					MinIndex = PhotoIndex.Value - 1;		// PhotoIndex is 1-based
 					MaxIndexExcl = MinIndex + 1;
 				}
 
@@ -146,14 +184,48 @@ namespace GetchMarsRoverPhoto
 				{
 					NasaApi.Photo Photo = DaySummary.Photos[i];
 					string DirPath = Path.Combine (OutputDir, Photo.EarthDate.ToString ("yyyy-MM-dd"));
-					Directory.CreateDirectory (DirPath);
+					
+					try
+					{
+						Directory.CreateDirectory (DirPath);
+					}
+					catch (Exception ex)
+					{
+						throw new AppException ($"Failed to create directory at {DirPath}"
+								+ (ex is UnauthorizedAccessException ? ". Must be privileges issue." : ""),
+							ex);
+					}
 
-					string Extension = Path.GetExtension (Photo.ImageUrl);
-					string ImageFileName = $"{Photo.Id}-{Photo.Rover.Name}-{Photo.Camera.Name}" + Extension;
+					string ImageFileName = $"{Photo.Id}-{Photo.Rover.Name}-{Photo.Camera.Name}.jpg";
 					string FilePath = Path.Combine (DirPath, ImageFileName);
 
-					// here: capture failure
-					Client.DownloadFile (Photo.ImageUrl, FilePath);
+					try
+					{
+						Client.DownloadFile (Photo.ImageUrl, FilePath);
+						++PhotosTotalCount;
+					}
+					catch (Exception ex)
+					{
+						if (ex is WebException wex)
+						{
+							if (wex.Message == "The remote server returned an error: (403) Forbidden.")
+							{
+								throw new NasaApiImageException (Photo.ImageUrl, ex);
+							}
+
+							if (wex.InnerException.GetType () == typeof (UnauthorizedAccessException))
+							{
+								throw new AppException ($"Failed to save photo at {FilePath}. Must be privileges issue.", ex);
+							}
+						}
+
+						if (ex is DirectoryNotFoundException)
+						{
+							throw new AppException ($"Failed to save photo at {FilePath}", ex);
+						}
+
+						throw new AppException ($"Failed to download photo at {Photo.ImageUrl}. Can be connection fault.", ex);
+					}
 
 					if (AutoOpen)
 					{
@@ -163,6 +235,12 @@ namespace GetchMarsRoverPhoto
 						pOpenImage.Start();
 					}
 				}
+			}
+
+			if (PhotosTotalCount == 0)
+			{
+				Console.Error.WriteLine ($"No photos are present for the specified date(s).");
+				return;
 			}
 		}
 	}
