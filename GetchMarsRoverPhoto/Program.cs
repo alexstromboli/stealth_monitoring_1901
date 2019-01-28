@@ -1,8 +1,12 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 using System.Linq;
+using System.Diagnostics;
 using System.Globalization;
 using System.Collections.Generic;
+
+using Newtonsoft.Json;
 
 namespace GetchMarsRoverPhoto
 {
@@ -62,7 +66,7 @@ namespace GetchMarsRoverPhoto
 			}
 
 			// parse index
-			int? PictureIndex = null;
+			int? PictureIndex = null;		// 1-based
 			if (strIndex != null)
 			{
 				int Index;
@@ -78,6 +82,12 @@ namespace GetchMarsRoverPhoto
 			if (AutoOpen && PictureIndex == null)
 			{
 				Console.Error.WriteLine ("Auto-open requires picture index.");
+				return;
+			}
+
+			if (PictureIndex != null && DatesFilePath != null)
+			{
+				Console.Error.WriteLine ("Picture index is only allowed for specific date.");
 				return;
 			}
 
@@ -106,6 +116,53 @@ namespace GetchMarsRoverPhoto
 			{
 				Console.Error.WriteLine ("No dates specified.");
 				return;
+			}
+
+			// loading
+			WebClient Client = new WebClient ();
+			foreach (DateTime Date in Dates)
+			{
+				// summary
+				string SummaryUrl = $"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={Date.ToString("yyyy-MM-dd")}&api_key={ApiKey}";
+				string SummaryJson = Client.DownloadString (SummaryUrl);
+				NasaApi.DaySummary DaySummary = JsonConvert.DeserializeObject<NasaApi.DaySummary> (SummaryJson);
+
+				if (PictureIndex != null && DaySummary.Photos.Length < PictureIndex.Value)
+				{
+					Console.Error.WriteLine ($"Picture index ({PictureIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
+					return;
+				}
+
+				int MinIndex = 0;
+				int MaxIndexExcl = DaySummary.Photos.Length;
+
+				if (PictureIndex != null)
+				{
+					MinIndex = PictureIndex.Value - 1;		// PictureIndex is 1-based
+					MaxIndexExcl = MinIndex + 1;
+				}
+
+				for (int i = MinIndex; i < MaxIndexExcl; ++i)
+				{
+					NasaApi.Photo Photo = DaySummary.Photos[i];
+					string DirPath = Path.Combine (OutputDir, Photo.EarthDate.ToString ("yyyy-MM-dd"));
+					Directory.CreateDirectory (DirPath);
+
+					string Extension = Path.GetExtension (Photo.ImageUrl);
+					string ImageFileName = $"{Photo.Id}-{Photo.Rover.Name}-{Photo.Camera.Name}" + Extension;
+					string FilePath = Path.Combine (DirPath, ImageFileName);
+
+					// here: capture failure
+					Client.DownloadFile (Photo.ImageUrl, FilePath);
+
+					if (AutoOpen)
+					{
+						Process pOpenImage = new Process ();
+						pOpenImage.StartInfo.UseShellExecute = true; 
+						pOpenImage.StartInfo.FileName = Photo.ImageUrl;
+						pOpenImage.Start();
+					}
+				}
 			}
 		}
 	}
