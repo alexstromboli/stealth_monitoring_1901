@@ -1,6 +1,8 @@
 using System.Linq;
 using System.Collections.Generic;
 
+// parsing command line arguments
+
 namespace GetchMarsRoverPhoto.Utils
 {
 	class Args : List<string>
@@ -10,6 +12,7 @@ namespace GetchMarsRoverPhoto.Utils
 		{
 		}
 
+		// find and extract a value specified by command line key
 		public string ExtractValue (params string[] Keys)
 		{
 			for (int i = 0; i < Count - 1; ++i)
@@ -26,6 +29,7 @@ namespace GetchMarsRoverPhoto.Utils
 			return null;
 		}
 
+		// find and extract a command line switch
 		public string ExtractKey (params string[] Keys)
 		{
 			for (int i = 0; i < Count; ++i)

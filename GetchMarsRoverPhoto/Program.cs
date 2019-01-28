@@ -10,6 +10,7 @@ namespace GetchMarsRoverPhoto
 {
 	class Program
 	{
+		// application usage prompt
 		static void PrintUsage ()
 		{
 				Console.Error.WriteLine ("Usage:");
@@ -17,11 +18,9 @@ namespace GetchMarsRoverPhoto
 					+ " <api-key> [<dates-file> | --date <date>] [--outDir <output-dir>] [--index <photo-index> [--open]]");
 		}
 
-		static void Run (string[] ArgsRaw)
+		// main application algorithm
+		static void Run (ProgramTask ProgramTask)
 		{
-			// task
-			ProgramTask ProgramTask = new ProgramTask (ArgsRaw);
-
 			// get the dates
 			List<DateTime> Dates = new List<DateTime> ();
 			if (ProgramTask.dtDay != null)
@@ -57,8 +56,7 @@ namespace GetchMarsRoverPhoto
 
 			if (Dates.Count == 0)
 			{
-				Console.Error.WriteLine ("No dates specified.");
-				return;
+				throw new AppException ("No dates specified.");
 			}
 
 			// loading
@@ -66,7 +64,7 @@ namespace GetchMarsRoverPhoto
 			int PhotosTotalCount = 0;
 			foreach (DateTime Date in Dates)
 			{
-				// summary
+				// day summary
 				string SummaryUrl = $"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={Date.ToString("yyyy-MM-dd")}&api_key={ProgramTask.ApiKey}";
 				
 				string SummaryJson;
@@ -98,19 +96,20 @@ namespace GetchMarsRoverPhoto
 				// verify length
 				if (ProgramTask.PhotoIndex != null && DaySummary.Photos.Length < ProgramTask.PhotoIndex.Value)
 				{
-					Console.Error.WriteLine ($"Photo index ({ProgramTask.PhotoIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
-					return;
+					throw new AppException ($"Photo index ({ProgramTask.PhotoIndex}) exceeds the photos count ({DaySummary.Photos.Length}).");
 				}
 
 				int MinIndex = 0;
 				int MaxIndexExcl = DaySummary.Photos.Length;
 
+				// narrow down the range for single photo
 				if (ProgramTask.PhotoIndex != null)
 				{
 					MinIndex = ProgramTask.PhotoIndex.Value - 1;		// PhotoIndex is 1-based
 					MaxIndexExcl = MinIndex + 1;
 				}
 
+				// go through all the photos
 				for (int i = MinIndex; i < MaxIndexExcl; ++i)
 				{
 					NasaApi.Photo Photo = DaySummary.Photos[i];
@@ -127,11 +126,13 @@ namespace GetchMarsRoverPhoto
 							ex);
 					}
 
+					// target filename
 					string ImageFileName = $"{Photo.Id}-{Photo.Rover.Name}-{Photo.Camera.Name}.jpg";
 					string FilePath = Path.Combine (DirPath, ImageFileName);
 
 					try
 					{
+						// actual downloading
 						Client.DownloadFile (Photo.ImageUrl, FilePath);
 						++PhotosTotalCount;
 					}
@@ -158,6 +159,7 @@ namespace GetchMarsRoverPhoto
 						throw new AppException ($"Failed to download photo at {Photo.ImageUrl}. Can be connection fault.", ex);
 					}
 
+					// open in browser
 					if (ProgramTask.AutoOpen)
 					{
 						Process pOpenImage = new Process ();
@@ -171,14 +173,18 @@ namespace GetchMarsRoverPhoto
 			if (PhotosTotalCount == 0)
 			{
 				Console.Error.WriteLine ($"No photos are present for the specified date(s).");
-				return;
 			}
 		}
+
+		// application entry point
 		static void Main (string[] ArgsRaw)
 		{
 			try
 			{
-				Run (ArgsRaw);
+				// task
+				ProgramTask ProgramTask = new ProgramTask (ArgsRaw);
+
+				Run (ProgramTask);
 			}
 			catch (NoArgumentsException)
 			{

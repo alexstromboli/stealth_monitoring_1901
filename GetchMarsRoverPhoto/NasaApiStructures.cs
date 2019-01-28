@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
+// NASA API data structures
+
 namespace GetchMarsRoverPhoto.NasaApi
 {
 	class DateFormatConverter : IsoDateTimeConverter

@@ -3,6 +3,8 @@ using System.IO;
 
 namespace GetchMarsRoverPhoto
 {
+	// application task parameters, parsed from command line arguments
+
 	class ProgramTask
 	{
 		// NASA API key

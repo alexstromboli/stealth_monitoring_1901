@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace GetchMarsRoverPhoto.Utils
 {
+	// date parsing utility
 	class ReadDateTime
 	{
 		public static readonly CultureInfo CultureInfo = new CultureInfo ("en-us");
@@ -16,6 +17,7 @@ namespace GetchMarsRoverPhoto.Utils
 					"MMM-d-yyyy"
 				};
 
+		// returns parsed date or null for misfit or null input
 		public static DateTime? Try (string Input)
 		{
 			if (Input == null)
